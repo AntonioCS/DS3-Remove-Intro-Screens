@@ -1,8 +1,10 @@
 #include <Windows.h>
 #include <MinHook.h>
-#include <string>
-#include <algorithm>
 #include <unknwn.h> //LPUNKNOWN
+#include <algorithm> //std::transform
+#include <string>
+#include <vector>
+#include <cstdint> // uint8_t
 
 /*
 #if _WIN32 || _WIN64
@@ -17,23 +19,60 @@
 struct Patch {
 	DWORD64 relAddr;
 	DWORD size;
-	char patch[50];
-	char orig[50];
+	uint8_t patch[50];
+	uint8_t orig[50];
 };
 
-enum GAME {
+const std::vector<Patch> Patches_DS1{
+	//Latest
+	Patch{ 0x8320B0, 7, { 0xE9, 0x27, 0x01, 0x00, 0x00, 0x90, 0x90},{ 0xFF, 0x24, 0x85, 0x24, 0x22, 0xC3, 0x00} },
+	Patch{ 0x8322B3, 2, { 0x90, 0x90}, { 0x74, 0x0D} },
+	//Debug build
+	Patch{ 0x831B30, 7, { 0xE9, 0x27, 0x01, 0x00, 0x00, 0x90, 0x90},{ 0xFF, 0x24, 0x85, 0xA4, 0x1C, 0xC3, 0x00} },
+	Patch{ 0x831D33, 2, { 0x90, 0x90},{ 0x74, 0x0D} }
+};
+
+const std::vector<Patch> Patches_DS3{
+	//v1.8
+	Patch{ 0x0BD6ACF, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0xAC, 0xC6, 0xFB, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0x9D, 0xC6, 0xFB, 0xFF} },
+	//v1.4
+	Patch{ 0x0BBB0CF, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0x8C, 0x07, 0xFC, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0x7D, 0x07, 0xFC, 0xFF} },
+	//v1.12
+	Patch{ 0x0BE7D9F, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0x0C, 0xBA, 0xFB, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0xFD, 0xB9, 0xFB, 0xFF} },
+	//v1.11
+	Patch{ 0x0BE6F8F, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0x9C, 0xBD, 0xFB, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0x8D, 0xBD, 0xFB, 0xFF} },
+	//v1.10
+	Patch{ 0x0BD70FF, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0xAC, 0xC6, 0xFB, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0x9D, 0xC6, 0xFB, 0xFF} },
+	//v1.9
+	Patch{ 0x0BD708F, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0xAC, 0xC6, 0xFB, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0x9D, 0xC6, 0xFB, 0xFF} },
+	//1.13
+	Patch{ 0x0BE993F, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0x1C, 0xBA, 0xFB, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0x0D, 0xBA, 0xFB, 0xFF} },
+	//1.14
+	Patch{ 0x0BE9C0F, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0x1C, 0xBA, 0xFB, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0x0D, 0xBA, 0xFB, 0xFF} },
+	//1.15
+	Patch{ 0x0BE9D0F, 20, { 0x48, 0x31, 0xC0, 0x48, 0x89, 0x02, 0x49, 0x89, 0x04, 0x24, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90},{ 0xE8, 0x1C, 0xBA, 0xFB, 0xFF, 0x90, 0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD4, 0x48, 0x8B, 0xC8, 0xE8, 0x0D, 0xBA, 0xFB, 0xFF} },
+};
+
+const std::vector<Patch> Patches_Sekiro{
+	//1.02
+	Patch{ 0x0A78738, 36, { 0x48, 0x31, 0xd2, 0x48, 0x89, 0x55, 0x67, 0x48, 0x89, 0x55, 0x7F, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, { 0x48, 0x8D, 0x57, 0x30, 0x48, 0x85, 0xFF, 0x48, 0x0F, 0x44, 0xD6, 0x48, 0x8D, 0x4D, 0x7F, 0xE8, 0x34, 0x3A, 0x37, 0x00, 0x90, 0x4C, 0x8B, 0xC3, 0x48, 0x8D, 0x55, 0x67, 0x48, 0x8B, 0xC8, 0xE8, 0x04, 0xD5, 0x33, 0x00} },
+	Patch{ 0x0A7B675, 33, { 0x48, 0x31, 0xd2, 0x48, 0x89, 0x94, 0x24, 0x98, 0x00, 0x00, 0x00, 0x48, 0x89, 0x54, 0x24, 0x20, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90}, { 0x48, 0x8B, 0xD7, 0x48, 0x8D, 0x4C, 0x24, 0x20, 0xE8, 0xFE, 0x0A, 0x37, 0x00, 0x90, 0x4C, 0x8B, 0xC3, 0x48, 0x8D, 0x94, 0x24, 0x98, 0x00, 0x00, 0x00, 0x48, 0x8B, 0xC8, 0xE8, 0xCA, 0xA5, 0x33, 0x00} },
+};
+
+
+enum class GAME {
 	DS1,
 	DS3,
 	SEKIRO,
 	UNKNOWN
 };
 
-GAME Game;
+GAME Game{};
 typedef DWORD64(__cdecl *STEAMINIT)();
-STEAMINIT fpSteamInit = NULL;
+STEAMINIT fpSteamInit = nullptr;
 
 typedef DWORD64(__stdcall *DIRECTINPUT8CREATE)(HINSTANCE, DWORD, REFIID, LPVOID *, LPUNKNOWN);
-DIRECTINPUT8CREATE fpDirectInput8Create;
+DIRECTINPUT8CREATE fpDirectInput8Create = nullptr;
 
 extern "C" __declspec(dllexport)  HRESULT __stdcall DirectInput8Create(
 	HINSTANCE hinst,
@@ -45,142 +84,86 @@ extern "C" __declspec(dllexport)  HRESULT __stdcall DirectInput8Create(
 {
 	return fpDirectInput8Create(hinst, dwVersion, riidltf, ppvOut, punkOuter);
 }
-struct MatchPathSeparator
+//struct MatchPathSeparator
+//{
+//	bool operator()(char ch) const
+//	{
+//		return ch == '\\' || ch == '/';
+//	}
+//};
+
+std::string basename(std::string const& pathname)
 {
-	bool operator()(char ch) const
+	static auto helper_func = [](char ch)
 	{
 		return ch == '\\' || ch == '/';
-	}
-};
-std::string
-basename(std::string const& pathname)
-{
+	};
+
 	return std::string(
-		std::find_if(pathname.rbegin(), pathname.rend(),
-			MatchPathSeparator()).base(),
+		std::find_if(
+			pathname.rbegin(), 
+			pathname.rend(),
+			//MatchPathSeparator()).base(),
+			helper_func).base(),
 		pathname.end());
 }
 
 GAME DetermineGame() {
-	const int fnLenMax = 200;
-	char fnPtr[fnLenMax];
-	auto fnLen = GetModuleFileNameA(0, fnPtr, fnLenMax);
+    char fnPtr[MAX_PATH];
+    auto fnLen = GetModuleFileNameA(0, fnPtr, MAX_PATH);
 
-	auto fileName = basename(std::string(fnPtr, fnLen));
-	std::transform(fileName.begin(), fileName.end(), fileName.begin(), ::tolower);
-	if (fileName == "darksouls.exe") {
-		return GAME::DS1;
-	}
-	else if (fileName == "darksoulsiii.exe") {
-		return GAME::DS3;
-	}
-	else if (fileName == "sekiro.exe") {
-		return GAME::SEKIRO;
-	}
-	else {
-		return GAME::UNKNOWN;
-	}
+    auto fileName = basename(std::string(fnPtr, fnLen));
+    std::transform(fileName.begin(), fileName.end(), fileName.begin(), ::tolower);
+
+    if (fileName == "darksouls.exe")	return GAME::DS1;	
+    if (fileName == "darksoulsiii.exe") return GAME::DS3;	
+    if (fileName == "sekiro.exe")		return GAME::SEKIRO;
+
+    return GAME::UNKNOWN;
 }
 
+void ApplyPatches(const std::vector<Patch>&);
+
 void ApplyDS1Patches() {
-	Patch patches[] = {
-		//Latest
-		Patch{ 0x8320B0, 7, { static_cast<char>(0xE9) , static_cast<char>(0x27) , static_cast<char>(0x01) , static_cast<char>(0x00) , static_cast<char>(0x00) , static_cast<char>(0x90) , static_cast<char>(0x90) },{ static_cast<char>(0xFF) , static_cast<char>(0x24) , static_cast<char>(0x85) , static_cast<char>(0x24) , static_cast<char>(0x22) , static_cast<char>(0xC3) , static_cast<char>(0x00) } },
-		Patch{ 0x8322B3, 2, { static_cast<char>(0x90) , static_cast<char>(0x90) }, { static_cast<char>(0x74) , static_cast<char>(0x0D) } },
-		//Debug build
-		Patch{ 0x831B30, 7, { static_cast<char>(0xE9) , static_cast<char>(0x27) , static_cast<char>(0x01) , static_cast<char>(0x00) , static_cast<char>(0x00) , static_cast<char>(0x90) , static_cast<char>(0x90) },{ static_cast<char>(0xFF) , static_cast<char>(0x24) , static_cast<char>(0x85) , static_cast<char>(0xA4) , static_cast<char>(0x1C) , static_cast<char>(0xC3) , static_cast<char>(0x00) } },
-		Patch{ 0x831D33, 2, { static_cast<char>(0x90) , static_cast<char>(0x90) },{ static_cast<char>(0x74) , static_cast<char>(0x0D) } }
-	};
-
-
-	auto baseAddr = GetModuleHandle(NULL);
-	for (auto i = 0; i < (sizeof(patches) / sizeof(patches[0])); i++) {
-		auto patch = patches[i];
-		auto addr = (void*)((DWORD64)baseAddr + patch.relAddr);
-		auto size = patch.size;
-
-		if (memcmp(addr, patch.orig, size) == 0) {
-			DWORD old;
-			VirtualProtect(addr, size, PAGE_EXECUTE_READWRITE, &old);
-			memcpy(addr, patch.patch, size);
-			VirtualProtect(addr, size, old, &old);
-		}
-	}
-
+    ApplyPatches(Patches_DS1);
 }
 
 void ApplyDS3Patches() {
-	Patch patches[] = {
-		//v1.8
-		Patch{ 0x0BD6ACF, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0xAC), static_cast<char>(0xC6), static_cast<char>(0xFB), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x9D), static_cast<char>(0xC6), static_cast<char>(0xFB), static_cast<char>(0xFF) } },
-		//v1.4
-		Patch{ 0x0BBB0CF, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0x8C), static_cast<char>(0x07), static_cast<char>(0xFC), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x7D), static_cast<char>(0x07), static_cast<char>(0xFC), static_cast<char>(0xFF) } },
-		//v1.12
-		Patch{ 0x0BE7D9F, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0x0C), static_cast<char>(0xBA), static_cast<char>(0xFB), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0xFD), static_cast<char>(0xB9), static_cast<char>(0xFB), static_cast<char>(0xFF) } },
-		//v1.11
-		Patch{ 0x0BE6F8F, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0x9C), static_cast<char>(0xBD), static_cast<char>(0xFB), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x8D), static_cast<char>(0xBD), static_cast<char>(0xFB), static_cast<char>(0xFF) } },
-		//v1.10
-		Patch{ 0x0BD70FF, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0xAC), static_cast<char>(0xC6), static_cast<char>(0xFB), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x9D), static_cast<char>(0xC6), static_cast<char>(0xFB), static_cast<char>(0xFF) } },
-		//v1.9
-		Patch{ 0x0BD708F, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0xAC), static_cast<char>(0xC6), static_cast<char>(0xFB), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x9D), static_cast<char>(0xC6), static_cast<char>(0xFB), static_cast<char>(0xFF) } },
-		//1.13
-		Patch{ 0x0BE993F, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0x1C), static_cast<char>(0xBA), static_cast<char>(0xFB), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x0D), static_cast<char>(0xBA), static_cast<char>(0xFB), static_cast<char>(0xFF) } },
-		//1.14
-		Patch{ 0x0BE9C0F, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0x1C), static_cast<char>(0xBA), static_cast<char>(0xFB), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x0D), static_cast<char>(0xBA), static_cast<char>(0xFB), static_cast<char>(0xFF) } },
-		//1.15
-		Patch{ 0x0BE9D0F, 20, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xC0), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x02), static_cast<char>(0x49), static_cast<char>(0x89), static_cast<char>(0x04), static_cast<char>(0x24), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },{ static_cast<char>(0xE8), static_cast<char>(0x1C), static_cast<char>(0xBA), static_cast<char>(0xFB), static_cast<char>(0xFF), static_cast<char>(0x90), static_cast<char>(0x4D), static_cast<char>(0x8B), static_cast<char>(0xC7), static_cast<char>(0x49), static_cast<char>(0x8B), static_cast<char>(0xD4), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x0D), static_cast<char>(0xBA), static_cast<char>(0xFB), static_cast<char>(0xFF) } },
-	};
-
-
-	auto baseAddr = GetModuleHandle(NULL);
-	for (auto i = 0; i < (sizeof(patches) / sizeof(patches[0])); i++) {
-		auto patch = patches[i];
-		auto addr = (void*)((DWORD64)baseAddr + patch.relAddr);
-		auto size = patch.size;
-
-		if (memcmp(addr, patch.orig, size) == 0) {
-			DWORD old;
-			VirtualProtect(addr, size, PAGE_EXECUTE_READWRITE, &old);
-			memcpy(addr, patch.patch, size);
-			VirtualProtect(addr, size, old, &old);
-			break;
-		}
-	}
+    ApplyPatches(Patches_DS3);
 }
 
 void ApplySekiroPatches() {
-	Patch patches[] = {
-		//1.02
-		Patch{ 0x0A78738, 36, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xd2), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x55), static_cast<char>(0x67), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x55), static_cast<char>(0x7F), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },
-							  { static_cast<char>(0x48), static_cast<char>(0x8D), static_cast<char>(0x57), static_cast<char>(0x30), static_cast<char>(0x48), static_cast<char>(0x85), static_cast<char>(0xFF), static_cast<char>(0x48), static_cast<char>(0x0F), static_cast<char>(0x44), static_cast<char>(0xD6), static_cast<char>(0x48), static_cast<char>(0x8D), static_cast<char>(0x4D), static_cast<char>(0x7F), static_cast<char>(0xE8), static_cast<char>(0x34), static_cast<char>(0x3A), static_cast<char>(0x37), static_cast<char>(0x00), static_cast<char>(0x90), static_cast<char>(0x4C), static_cast<char>(0x8B), static_cast<char>(0xC3), static_cast<char>(0x48), static_cast<char>(0x8D), static_cast<char>(0x55), static_cast<char>(0x67), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0x04), static_cast<char>(0xD5), static_cast<char>(0x33), static_cast<char>(0x00) } },
-		Patch{ 0x0A7B675, 33, { static_cast<char>(0x48), static_cast<char>(0x31), static_cast<char>(0xd2), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x94), static_cast<char>(0x24), static_cast<char>(0x98), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x48), static_cast<char>(0x89), static_cast<char>(0x54), static_cast<char>(0x24), static_cast<char>(0x20), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90), static_cast<char>(0x90) },
-		                      { static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xD7), static_cast<char>(0x48), static_cast<char>(0x8D), static_cast<char>(0x4C), static_cast<char>(0x24), static_cast<char>(0x20), static_cast<char>(0xE8), static_cast<char>(0xFE), static_cast<char>(0x0A), static_cast<char>(0x37), static_cast<char>(0x00), static_cast<char>(0x90), static_cast<char>(0x4C), static_cast<char>(0x8B), static_cast<char>(0xC3), static_cast<char>(0x48), static_cast<char>(0x8D), static_cast<char>(0x94), static_cast<char>(0x24), static_cast<char>(0x98), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x48), static_cast<char>(0x8B), static_cast<char>(0xC8), static_cast<char>(0xE8), static_cast<char>(0xCA), static_cast<char>(0xA5), static_cast<char>(0x33), static_cast<char>(0x00) } },
-
-	};
-
-	auto baseAddr = GetModuleHandle(NULL);
-	for (auto i = 0; i < (sizeof(patches) / sizeof(patches[0])); i++) {
-		auto patch = patches[i];
-		auto addr = (void*)((DWORD64)baseAddr + patch.relAddr);
-		auto size = patch.size;
-
-		if (memcmp(addr, patch.orig, size) == 0) {
-			DWORD old;
-			VirtualProtect(addr, size, PAGE_EXECUTE_READWRITE, &old);
-			memcpy(addr, patch.patch, size);
-			VirtualProtect(addr, size, old, &old);
-		}
-	}
+    ApplyPatches(Patches_Sekiro);
 }
 
+
+void ApplyPatches(const std::vector<Patch>& patches)
+{
+	const auto* baseAddr = GetModuleHandle(NULL);
+
+    for (const auto& patch : patches) {
+        auto* addr = (void*)((DWORD64)baseAddr + patch.relAddr);
+        auto size = patch.size;
+
+        if (memcmp(addr, patch.orig, size) == 0) {
+            DWORD old;
+            VirtualProtect(addr, size, PAGE_EXECUTE_READWRITE, &old);
+            memcpy(addr, patch.patch, size);
+            VirtualProtect(addr, size, old, &old);
+            break;
+        }
+    }
+}
+
+
 DWORD64 __cdecl onSteamInit() {
-	if (Game == GAME::DS3) {
-		ApplyDS3Patches();
-	}
-	else if (Game == GAME::SEKIRO) {
-		ApplySekiroPatches();
-	}
-	return fpSteamInit();
+    if (Game == GAME::DS3) {
+        ApplyDS3Patches();
+    }
+    else if (Game == GAME::SEKIRO) {
+        ApplySekiroPatches();
+    }
+    return fpSteamInit();
 }
 
 
@@ -193,7 +176,7 @@ void SetupD8Proxy() {
 }
 
 void AttachSteamHook() {
-	auto steamApiHwnd = GetModuleHandle(L"steam_api64.dll");
+	auto* steamApiHwnd = GetModuleHandle(L"steam_api64.dll");
 	auto initAddr = GetProcAddress(steamApiHwnd, "SteamAPI_Init");
 
 	MH_CreateHook(initAddr, &onSteamInit, reinterpret_cast<LPVOID*>(&fpSteamInit));
@@ -228,6 +211,7 @@ BOOL APIENTRY DllMain(
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 	case DLL_PROCESS_DETACH:
+    default:
 		break;
 	}
 	return TRUE;
