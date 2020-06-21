@@ -24,6 +24,7 @@ endif()
 file(GLOB_RECURSE PROJ_SRC_FILES
 	CONFIGURE_DEPENDS
 	src/*.c* src/*.h*
+#	src/*.def
 )
 
 #To properly set the files in the treeview for MSVC
